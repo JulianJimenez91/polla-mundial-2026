@@ -657,9 +657,9 @@ function renderMatches(){
     html += `</div>
       <div class="actual-row">
         <div class="actual-lbl">RESULTADO REAL</div>
-        <input class="score-input" type="number" min="0" max="20" value="${actual?actual.split('-')[0]:''}" onchange="setActual(${i},this.value,null)" placeholder="-">
+        <input class="score-input" id="sc-${i}-h" type="number" min="0" max="20" value="${actual?actual.split('-')[0]:''}" oninput="setActual(${i})" placeholder="-">
         <div class="score-dash">—</div>
-        <input class="score-input" type="number" min="0" max="20" value="${actual?actual.split('-')[1]:''}" onchange="setActual(${i},null,this.value)" placeholder="-">
+        <input class="score-input" id="sc-${i}-a" type="number" min="0" max="20" value="${actual?actual.split('-')[1]:''}" oninput="setActual(${i})" placeholder="-">
       </div>
     </div>`;
     c.innerHTML += html;
@@ -667,20 +667,45 @@ function renderMatches(){
   updateScoreboard();
 }
 
-let tempScores = {};
-function setActual(idx,h,a){
-  const cur = (actualResults[idx]||'-').split('-');
-  if(h!==null) cur[0] = h;
-  if(a!==null) cur[1] = a;
-  if(cur[0]!=='' && cur[1]!=='' && cur[0]!==undefined && cur[1]!==undefined){
-    actualResults[idx] = `${cur[0]}-${cur[1]}`;
+function setActual(idx){
+  const hEl = document.getElementById(`sc-${idx}-h`);
+  const aEl = document.getElementById(`sc-${idx}-a`);
+  if(!hEl || !aEl) return;
+  const h = hEl.value.trim();
+  const a = aEl.value.trim();
+
+  // Save only when BOTH fields have a value; otherwise keep what's typed, don't wipe
+  if(h !== '' && a !== ''){
+    actualResults[idx] = `${h}-${a}`;
   } else {
     delete actualResults[idx];
   }
   localStorage.setItem('polla2026_results', JSON.stringify(actualResults));
   if(fbDb) syncToFirebase();
-  renderMatches();
+
+  // Update ONLY this match's prediction colors (no full re-render that would wipe inputs)
+  updateMatchColors(idx);
+  updateScoreboard();
   if(document.getElementById('tab-trends').classList.contains('active')) renderTrends();
+}
+
+// Recolor the 3 prediction boxes of one match based on its actual result
+function updateMatchColors(idx){
+  const matchEl = document.querySelector(`.match[data-idx="${idx}"]`);
+  if(!matchEl) return;
+  const actual = actualResults[idx] || '';
+  const realW = scoreToWinner(actual);
+  const preds = matchEl.querySelectorAll('.pred');
+  const scores = [MATCHES[idx][4], MATCHES[idx][5], MATCHES[idx][6]];
+  preds.forEach((el,j)=>{
+    el.classList.remove('score-correct','win-correct');
+    if(actual){
+      const p = scores[j];
+      const predW = scoreToWinner(p);
+      if(p === actual) el.classList.add('score-correct');
+      else if(predW === realW) el.classList.add('win-correct');
+    }
+  });
 }
 
 // ============================================================
